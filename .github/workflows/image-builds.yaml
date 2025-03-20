@@ -59,20 +59,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           outputs: |
             type=docker
-            ${{ startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' && format('type=image,name=ghcr.io/{0},push-by-digest=true,name-canonical=true,push=true', github.repository) || '' }}
+            ${{ github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request' && format('type=image,name=ghcr.io/{0},push-by-digest=true,name-canonical=true,push=true', github.repository) || '' }}
           context: .
           file: ./Dockerfile
           platforms: linux/${{ matrix.platform }}
           provenance: false
 
-      - if: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' }}
+      - if: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request' }}
         name: Export Digest
         id: digest
         run: |
           echo "${{ matrix.platform }}=${{ steps.build.outputs.digest }}" >> $GITHUB_OUTPUT
 
   release:
-    if: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request' }}
     needs: build
     name: Release Container
     runs-on: ubuntu-latest
@@ -116,7 +116,7 @@ jobs:
           echo "digest=${digest}" >> $GITHUB_OUTPUT
 
   sign:
-    if: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request' }}
     needs: release
     name: Sign Container
     runs-on: ubuntu-latest
@@ -135,7 +135,7 @@ jobs:
         run: cosign sign --yes ghcr.io/${{ github.repository }}@${{ needs.release.outputs.digest }}
 
   attest:
-    if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push'
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request' }}
     needs: release
     name: Attest Container
     runs-on: ubuntu-latest
